@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Melatonin Vibes - Dancin' Rhythm Game</title>
+    <title>Melatonin Vibes - Custom Audio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap');
@@ -16,6 +16,7 @@
             font-family: 'Fredoka', sans-serif;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: none; /* Prevent pull-to-refresh/scroll on mobile */
         }
 
         #game-container {
@@ -33,32 +34,6 @@
             top: 0;
             left: 0;
             z-index: 10;
-        }
-
-        /* The YouTube iframe - styled to look like a music player widget */
-        #video-wrapper {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            height: 170px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 10px;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            z-index: 20;
-            transition: opacity 0.3s;
-            pointer-events: none; /* Let clicks pass through if needed, but we want controls */
-            pointer-events: auto;
-        }
-
-        #player {
-            width: 100%;
-            height: 100%;
-            border-radius: 12px;
-            opacity: 0.8;
         }
 
         /* UI Overlay */
@@ -93,7 +68,7 @@
 
         #feedback {
             position: absolute;
-            top: 30%; /* Moved up slightly to not cover character */
+            top: 30%;
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 3rem;
@@ -121,6 +96,26 @@
             transition: opacity 0.5s;
         }
 
+        .upload-box {
+            border: 3px dashed #6c5ce7;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            pointer-events: auto;
+        }
+
+        .upload-box:hover {
+            background: rgba(255, 255, 255, 0.8);
+            transform: scale(1.02);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
         .btn-start {
             background: #6c5ce7;
             color: white;
@@ -133,6 +128,7 @@
             transition: transform 0.2s, background 0.2s;
             font-family: 'Fredoka', sans-serif;
             pointer-events: auto;
+            margin-top: 20px;
         }
 
         .btn-start:hover {
@@ -140,36 +136,28 @@
             background: #5649c0;
         }
 
-        .loading {
-            font-size: 1.2rem;
-            color: #6c5ce7;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        
-        /* Hide UI when hidden class added */
+        /* Fix: Use display none to ensure button is unclickable */
         .hidden {
-            opacity: 0;
-            pointer-events: none !important;
+            display: none !important;
         }
 
-        /* Custom pulse animation for background elements */
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-            100% { transform: translateY(0px); }
+        /* Mode Toggle */
+        .mode-toggle {
+            margin-top: 20px;
+            background: rgba(255,255,255,0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            pointer-events: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <!-- YouTube Player Container -->
-        <div id="video-wrapper">
-            <div id="player"></div>
-        </div>
-
-        <!-- Canvas for Rendering Game -->
+        
         <canvas id="gameCanvas"></canvas>
 
         <!-- Game UI -->
@@ -180,31 +168,44 @@
                     <div id="combo-display" class="hud-text">Combo: 0</div>
                 </div>
                 <div class="text-right hud-text opacity-70 text-sm">
-                    <p>Song: Dancin (Krono Remix)</p>
-                    <p>BPM: 120</p>
-                    <p>Press SPACE or CLICK on beat</p>
+                    <p id="song-name">Waiting for Audio...</p>
+                    <p>BPM: 120 (Assumed)</p>
                 </div>
             </div>
-            <div id="mode-display" class="hud-text text-center text-2xl font-bold opacity-70">→ RIGHT</div>
             <div id="feedback">Perfect!</div>
         </div>
 
         <!-- Start Screen -->
         <div id="start-screen">
-            <h1 class="text-5xl md:text-7xl font-bold text-[#6c5ce7] mb-4 tracking-tight text-center drop-shadow-sm">DREAM RHYTHM</h1>
-            <p class="text-xl text-gray-600 mb-8 font-light max-w-md text-center">Relax. Listen. Catch the orbs with the beat.</p>
-            <div id="loading-msg" class="loading">Loading Music...</div>
-            <button id="start-btn" class="btn-start hidden" onclick="startGame()">Start Dreaming</button>
+            <h1 class="text-5xl md:text-7xl font-bold text-[#6c5ce7] mb-2 tracking-tight text-center">DREAM RHYTHM</h1>
+            <p class="text-xl text-gray-600 mb-8 font-light text-center">Upload your MP3 for perfect sync.</p>
+            
+            <label class="upload-box" id="upload-label">
+                <div class="text-4xl mb-2">🎵</div>
+                <div class="font-bold text-[#6c5ce7] text-xl">Click to Upload Song</div>
+                <div class="text-sm text-gray-500 mt-1">Supports MP3, WAV</div>
+                <input type="file" id="audio-file" accept="audio/*">
+            </label>
+
+            <div class="mode-toggle">
+                <label class="flex items-center gap-2 cursor-pointer text-gray-700 font-bold">
+                    <input type="checkbox" id="auto-gen-mode" class="w-5 h-5">
+                    Auto-Generate Notes? 
+                </label>
+                <span class="text-xs text-gray-500 block">(Check this if not using "Dancin")</span>
+            </div>
+
+            <div id="loading-msg" class="text-[#6c5ce7] font-bold mt-4 hidden">Processing Audio...</div>
+            <button id="start-btn" class="btn-start hidden" onclick="startGame()">Start Game</button>
         </div>
     </div>
 
     <script>
-        // --- Constants & Config ---
-        const BPM = 120;
-        const BEAT_INTERVAL = 60 / BPM; // Seconds per beat (0.5s)
-        const TRAVEL_TIME_BEATS = 4; // How many beats it takes for an object to travel to target
-        const AUDIO_OFFSET = 0.1; // Slight adjustment for audio/visual sync (seconds)
-        const HIT_WINDOW = 0.2; // Seconds +/- to count as a hit (increased for easier play)
+        // --- Constants ---
+        const BPM = 120; 
+        const BEAT_INTERVAL = 60 / BPM; 
+        const TRAVEL_TIME_BEATS = 4; 
+        const HIT_WINDOW = 0.15; 
         
         // Colors
         const COLORS = {
@@ -219,20 +220,24 @@
             darkPurple: '#5649c0'
         };
 
-        // --- Game State ---
+        // --- Audio Context & State ---
+        let audioCtx;
+        let audioBuffer;
+        let audioSource;
+        let analyser;
+        let dataArray;
+        
         let isPlaying = false;
-        let audioContextTime = 0;
         let startTime = 0;
-        let lastBeat = 0;
+        let gameTime = 0;
         let score = 0;
         let combo = 0;
-        let gameTime = 0;
-        let notes = []; // Array of objects { beatTime, hit, visible }
-        let particles = []; // Visual effects
-        let zzzParticles = []; // Sleep particles
-        let burstParticles = []; // Orb burst particles when hit
-        
-        // Canvas Setup
+        let notes = [];
+        let particles = [];
+        let zzzParticles = [];
+        let pulseRings = [];
+
+        // --- Canvas Setup ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let width, height;
@@ -246,121 +251,187 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // --- YouTube API Setup ---
-        let player;
-        let videoReady = false;
+        // --- File Upload Handling ---
+        const fileInput = document.getElementById('audio-file');
+        const startBtn = document.getElementById('start-btn');
+        const loadingMsg = document.getElementById('loading-msg');
+        const uploadLabel = document.getElementById('upload-label');
 
-        // Load YouTube IFrame API asynchronously
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
 
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '100%',
-                width: '100%',
-                videoId: '6Nb-prB-4P0', // Dancin - Krono Remix
-                playerVars: {
-                    'playsinline': 1,
-                    'controls': 0, // Hide controls for game feel
-                    'disablekb': 1,
-                    'fs': 0,
-                    'start': 10 // Start 10 seconds in to skip silence/intro if needed
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
+            document.getElementById('song-name').innerText = `Song: ${file.name}`;
+            uploadLabel.classList.add('hidden');
+            loadingMsg.classList.remove('hidden');
+            loadingMsg.innerText = "Decoding Audio...";
+
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                initAudio(ev.target.result);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function initAudio(arrayBuffer) {
+            // Create context if not exists
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            audioCtx.decodeAudioData(arrayBuffer, (buffer) => {
+                audioBuffer = buffer;
+                loadingMsg.classList.add('hidden');
+                startBtn.classList.remove('hidden');
+                
+                if(document.getElementById('auto-gen-mode').checked) {
+                    generateAutoMap(buffer);
+                } else {
+                    generateDancinMap(buffer.duration);
                 }
+
+            }, (e) => {
+                loadingMsg.innerText = "Error decoding audio file.";
+                console.error(e);
             });
         }
 
-        function onPlayerReady(event) {
-            videoReady = true;
-            document.getElementById('loading-msg').classList.add('hidden');
-            document.getElementById('start-btn').classList.remove('hidden');
-        }
+        // --- Note Generation ---
 
-        function onPlayerStateChange(event) {
-            // Sync game loop if video buffers
-            if (event.data == YT.PlayerState.PLAYING) {
-                // Resync logic could go here
-            } else if (event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.ENDED) {
-                // isPlaying = false;
+        function generateDancinMap(duration) {
+            notes = [];
+            let totalBeats = (duration / 60) * 120; 
+            let noteCount = 0;
+
+            for(let i = 0; i < totalBeats; i++) {
+                let shouldSpawn = false;
+                let type = 'beat';
+                let side = 'right'; 
+
+                if(i > 8 && i < 32 && i % 4 === 0) shouldSpawn = true;
+                
+                else if(i >= 32 && i < 96) {
+                    shouldSpawn = true;
+                    if(i % 8 === 7) {
+                        notes.push({ beatIndex: i + 0.5, hit: false, type: 'offbeat', side: 'right' });
+                    }
+                }
+                
+                else if(i >= 96 && i < 128) {
+                     if(i % 2 === 0) shouldSpawn = true;
+                }
+                
+                else if(i >= 128) {
+                    shouldSpawn = true;
+                    if(Math.random() > 0.8 && i%2===0) notes.push({ beatIndex: i + 0.5, hit: false, type: 'offbeat', side: 'right' });
+                }
+
+                if(shouldSpawn) {
+                    noteCount++;
+                    if (noteCount % 8 === 0) side = 'both';
+                    else if (noteCount % 2 === 0) side = 'left';
+                    else side = 'right';
+
+                    notes.push({ beatIndex: i, hit: false, type: 'beat', side: side });
+                }
             }
         }
 
-        // --- Game Loop & Logic ---
-
-        function startGame() {
-            if (!videoReady) return;
-            
-            document.getElementById('start-screen').classList.add('hidden');
-            player.playVideo();
-            
-            // Initialize Game
-            score = 0;
-            combo = 0;
+        function generateAutoMap(buffer) {
             notes = [];
-            zzzParticles = [];
-            updateScore();
-            
-            // Generate Notes Pattern
-            // We'll generate notes procedurally for the song duration (~3 mins)
-            // Pattern: Simple 4/4 beat with variation in direction (left, right, both)
-            let totalBeats = 120 * 3.5; // approx 3.5 mins
-            
-            const directions = ['right', 'left', 'both'];
-            
-            // Wait a few seconds for intro before spawning
-            for(let i = 8; i < totalBeats; i++) {
-                // Cycle through directions every 8 beats
-                const direction = directions[Math.floor((i - 8) / 8) % 3];
-                
-                // Easier play: More frequent beats, simpler pattern
-                if (Math.random() > 0.05) {
-                    // Add some variation
-                    if (i % 4 === 0) {
-                        // Downbeat - always spawn
-                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
-                    } else if (i % 8 === 7 && Math.random() > 0.3) {
-                        // Double beat flair - more frequent
-                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
-                        notes.push({ beatIndex: i + 0.5, hit: false, type: 'offbeat', direction: direction });
-                    } else if (Math.random() > 0.4) {
-                        // Additional beat for engagement
-                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
+            const rawData = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            const step = sampleRate / 4; 
+            let noteCount = 0;
+
+            for (let i = 0; i < rawData.length; i += step) {
+                let max = 0;
+                for(let j=0; j < step && i+j < rawData.length; j++) {
+                    const val = Math.abs(rawData[i+j]);
+                    if(val > max) max = val;
+                }
+
+                if(max > 0.5) { 
+                    const time = i / sampleRate;
+                    const beatIndex = time / BEAT_INTERVAL;
+                    
+                    if(notes.length === 0 || beatIndex - notes[notes.length-1].beatIndex > 0.5) {
+                         noteCount++;
+                         let side = 'right';
+                         if(max > 0.8) side = 'both'; 
+                         else if(noteCount % 2 === 0) side = 'left';
+                         
+                         notes.push({ 
+                             beatIndex: beatIndex, 
+                             hit: false, 
+                             type: max > 0.8 ? 'offbeat' : 'beat',
+                             side: side
+                         });
                     }
                 }
             }
+        }
 
+        // --- Game Loop ---
+
+        function startGame() {
+            // BUG FIX: Prevent starting if already playing to avoid overlap
+            if (isPlaying) return;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            
+            // Stop any existing source just in case
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e) {}
+            }
+
+            // Resume context if suspended (browsers require user gesture)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            audioSource = audioCtx.createBufferSource();
+            audioSource.buffer = audioBuffer;
+            
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            audioSource.connect(analyser);
+            analyser.connect(audioCtx.destination);
+            
+            audioSource.start(0);
+            startTime = audioCtx.currentTime;
+            
+            score = 0;
+            combo = 0;
+            pulseRings = [];
+            updateScore();
+            
             isPlaying = true;
             requestAnimationFrame(gameLoop);
         }
 
         function gameLoop() {
-            if (!isPlaying) return;
-
-            // Sync Time
-            // We use player.getCurrentTime() but smooth it because it doesn't update every frame
-            const currentTime = player.getCurrentTime(); 
+            if(!isPlaying) return;
             
-            if (currentTime) {
-                gameTime = currentTime; 
+            gameTime = audioCtx.currentTime - startTime;
+            
+            if(gameTime > audioBuffer.duration) {
+                isPlaying = false;
+                showFeedback("Complete!", COLORS.primary);
+                return;
             }
 
             updateLogic();
             render();
-            
             requestAnimationFrame(gameLoop);
         }
 
         function updateLogic() {
-            // Check for misses
             const currentBeat = gameTime / BEAT_INTERVAL;
             
             notes.forEach(note => {
-                // If note passed the hit window and wasn't hit
                 if (!note.hit && !note.missed && note.beatIndex < currentBeat - (HIT_WINDOW / BEAT_INTERVAL)) {
                     note.missed = true;
                     combo = 0;
@@ -369,25 +440,19 @@
                 }
             });
 
-            // Update particles (explosions)
             for (let i = particles.length - 1; i >= 0; i--) {
-                particles[i].life -= 0.02;
+                particles[i].life -= 0.025;
                 particles[i].x += particles[i].vx;
                 particles[i].y += particles[i].vy;
                 if (particles[i].life <= 0) particles.splice(i, 1);
             }
 
-            // Update burst particles (orb bursts)
-            for (let i = burstParticles.length - 1; i >= 0; i--) {
-                burstParticles[i].life -= 0.03;
-                burstParticles[i].x += burstParticles[i].vx;
-                burstParticles[i].y += burstParticles[i].vy;
-                burstParticles[i].vy += 0.2; // Gravity effect
-                if (burstParticles[i].life <= 0) burstParticles.splice(i, 1);
+            for (let i = pulseRings.length - 1; i >= 0; i--) {
+                pulseRings[i].radius += 5;
+                pulseRings[i].opacity -= 0.03;
+                if (pulseRings[i].opacity <= 0) pulseRings.splice(i, 1);
             }
 
-            // Update Zzz particles
-            // Spawn random Zs
             if (Math.random() < 0.02) {
                  zzzParticles.push({
                      x: width/2 + (Math.random() * 40 - 20),
@@ -398,15 +463,11 @@
                      scale: 0
                  });
             }
-
             for (let i = zzzParticles.length - 1; i >= 0; i--) {
                 zzzParticles[i].life -= 0.005;
                 zzzParticles[i].x += zzzParticles[i].vx;
                 zzzParticles[i].y += zzzParticles[i].vy;
-                
-                // Scale up then fade out
                 if (zzzParticles[i].life > 0.8) zzzParticles[i].scale += 0.02;
-                
                 if (zzzParticles[i].life <= 0) zzzParticles.splice(i, 1);
             }
         }
@@ -414,22 +475,22 @@
         function inputAction(e) {
             if (!isPlaying) return;
             if (e.type === 'keydown' && e.code !== 'Space') return;
-            
-            e.preventDefault(); // Stop scrolling
 
-            const currentBeat = gameTime / BEAT_INTERVAL;
+            // Fix: Prevent default touch behavior to avoid ghost mouse clicks and scrolling
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+
+            // Basic Debounce for mouse/touch overlap if needed (handled by preventDefault primarily)
             
-            // Find closest hittable note
+            const currentBeat = gameTime / BEAT_INTERVAL;
             let hitNote = null;
             let minDiff = Infinity;
             
             for (let note of notes) {
                 if (note.hit || note.missed) continue;
-                
                 const diff = Math.abs(note.beatIndex - currentBeat);
-                
                 if (diff * BEAT_INTERVAL <= HIT_WINDOW) {
-                    // This is a candidate
                     if (diff < minDiff) {
                         minDiff = diff;
                         hitNote = note;
@@ -440,72 +501,53 @@
             if (hitNote) {
                 hitNote.hit = true;
                 const timing = minDiff * BEAT_INTERVAL;
-                
-                // Calculate hit position based on direction
-                let hitX = width/2;
-                if (hitNote.direction === 'left') hitX = width * 0.25;
-                else if (hitNote.direction === 'right') hitX = width * 0.75;
-                
-                // Scoring
+                const cx = width / 2;
+                const cy = height / 2;
+
                 if (timing < 0.05) {
-                    score += 100;
-                    combo++;
-                    showFeedback("Perfect!", COLORS.primary);
-                    createExplosion(hitX, height/2, COLORS.primary);
-                    createOrbBurst(hitX, height/2, COLORS.primary, hitNote.type);
+                    score += 100; combo++; showFeedback("Perfect!", COLORS.primary);
+                    spawnPulseRing(cx, cy, COLORS.primary);
                 } else if (timing < 0.1) {
-                    score += 50;
-                    combo++;
-                    showFeedback("Good", COLORS.secondary);
-                    createExplosion(hitX, height/2, COLORS.secondary);
-                    createOrbBurst(hitX, height/2, COLORS.secondary, hitNote.type);
+                    score += 50; combo++; showFeedback("Good", COLORS.secondary);
+                    spawnPulseRing(cx, cy, COLORS.secondary);
                 } else {
-                    score += 30;
-                    combo++; // Keep combo, easier scoring
-                    showFeedback("Okay", COLORS.accent);
-                    createOrbBurst(hitX, height/2, COLORS.accent, hitNote.type);
+                    score += 20; combo++; showFeedback("Okay", COLORS.accent);
                 }
                 
-                // Catch animation trigger - Character wake/bop
-                catcher.scale = 1.2; // Bounce bigger
-            } else {
-                // Whiff
+                catcher.scale = 1.4; 
+                createExplosion(cx, cy, hitNote.type === 'offbeat' ? COLORS.accent : COLORS.secondary);
+
             }
-            
             updateScore();
         }
 
-        // Input Listeners
         window.addEventListener('keydown', inputAction);
-        window.addEventListener('touchstart', inputAction);
+        // Use { passive: false } to ensure preventDefault works on modern browsers
+        window.addEventListener('touchstart', inputAction, { passive: false });
         window.addEventListener('mousedown', inputAction);
 
         // --- Rendering ---
 
-        // Animation helper
-        const catcher = {
-            baseScale: 1,
-            scale: 1
-        };
+        const catcher = { baseScale: 1, scale: 1 };
 
         function render() {
-            // Clear
             ctx.clearRect(0, 0, width, height);
 
+            analyser.getByteFrequencyData(dataArray);
+            let bassTotal = 0;
+            for(let i=0; i<10; i++) bassTotal += dataArray[i];
+            const bassAvg = bassTotal / 10; 
+            const bassNorm = bassAvg / 255; 
+
             const currentBeat = gameTime / BEAT_INTERVAL;
-            const beatPhase = currentBeat % 1; // 0 to 1
-            const pulse = Math.pow(1 - beatPhase, 3); // Strong at start of beat, fades
+            const cx = width / 2;
+            const cy = height / 2;
 
-            // Update mode display based on current section
-            const currentDirection = ['right', 'left', 'both'][Math.floor((currentBeat - 8) / 8) % 3];
-            const directionSymbol = currentDirection === 'left' ? '← LEFT' : currentDirection === 'both' ? '↔ BOTH' : '→ RIGHT';
-            document.getElementById('mode-display').innerText = directionSymbol;
-
-            // Draw dreamy background grid
+            // Grid
             ctx.strokeStyle = COLORS.grid;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 + (bassNorm * 5); 
             const gridSize = 100;
-            const offset = (gameTime * 50) % gridSize;
+            const offset = (gameTime * 100) % gridSize; 
             
             ctx.beginPath();
             for(let x = 0; x <= width; x += gridSize) {
@@ -514,42 +556,24 @@
             }
             ctx.stroke();
 
-            // --- Draw Character ---
-            const cx = width / 2;
-            const cy = height / 2;
+            // Pulse Rings
+            pulseRings.forEach(ring => {
+                ctx.beginPath();
+                ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color || COLORS.white;
+                ctx.lineWidth = 4;
+                ctx.globalAlpha = ring.opacity;
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1;
 
-            // --- Draw Hit Zone Indicators ---
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
-            
-            // Left zone
-            ctx.beginPath();
-            ctx.arc(width * 0.25, cy, 80, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            // Center zone
-            ctx.beginPath();
-            ctx.arc(width / 2, cy, 80, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            // Right zone
-            ctx.beginPath();
-            ctx.arc(width * 0.75, cy, 80, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            ctx.setLineDash([]);
-            
-            // Ease the catcher scale back to base
+            // Character
             catcher.scale += (catcher.baseScale - catcher.scale) * 0.1;
-            
-            // Bop the character on every beat even if not playing
-            const beatBop = pulse * 0.05; 
+            const beatBop = bassNorm * 0.2; 
             const finalScale = catcher.scale + beatBop;
-
             drawCharacter(ctx, cx, cy, finalScale);
 
-            // --- Draw Zzz Particles ---
+            // Zzz
             zzzParticles.forEach(z => {
                 ctx.globalAlpha = z.life;
                 ctx.fillStyle = COLORS.white;
@@ -558,57 +582,36 @@
             });
             ctx.globalAlpha = 1;
 
-            // --- Draw Notes (Orbs) ---
-            
+            // Notes
             notes.forEach(note => {
-                if (note.hit) return; // Don't draw hit notes
-
+                if (note.hit) return;
                 const timeToHit = (note.beatIndex - currentBeat) * BEAT_INTERVAL;
                 
-                // Only draw if within visible range (e.g., 2 seconds out)
                 if (timeToHit > -0.5 && timeToHit < 2) {
-                    
-                    // Calculate position based on direction
-                    let startX, targetX;
-                    if (note.direction === 'left') {
-                        startX = -100;
-                        targetX = width * 0.25;
-                    } else if (note.direction === 'both') {
-                        // For 'both', alternate left and right
-                        if (note.beatIndex % 2 === 0) {
-                            startX = -100;
-                            targetX = width * 0.25;
-                        } else {
-                            startX = width + 100;
-                            targetX = width * 0.75;
-                        }
-                    } else {
-                        // default 'right'
-                        startX = width + 100;
-                        targetX = width * 0.75;
-                    }
-                    
-                    // Interpolate position based on time to hit
-                    const progress = 1 - (timeToHit / 2); // 2 second travel time
-                    const x = startX + (targetX - startX) * Math.max(0, Math.min(1, progress));
-                    const y = cy; 
-                    
-                    // Visuals for the note
+                    const distance = timeToHit * 400; 
+                    const bob = Math.sin(gameTime * 8) * 15;
                     let alpha = 1;
                     if (note.missed) alpha = 0.5;
-
                     ctx.globalAlpha = alpha;
                     
-                    // Bobbing effect based on time
-                    const bob = Math.sin(gameTime * 8) * 15;
-                    
-                    drawOrb(ctx, x, y + bob, 20, note.type === 'offbeat' ? COLORS.accent : COLORS.secondary);
+                    const color = note.type === 'offbeat' ? COLORS.accent : COLORS.secondary;
+
+                    if (note.side === 'right') {
+                        drawOrb(ctx, cx + distance, cy + bob, 20, color);
+                    } 
+                    else if (note.side === 'left') {
+                        drawOrb(ctx, cx - distance, cy + bob, 20, color);
+                    } 
+                    else if (note.side === 'both') {
+                        drawOrb(ctx, cx + distance, cy + bob, 20, color);
+                        drawOrb(ctx, cx - distance, cy + bob, 20, color);
+                    }
                     
                     ctx.globalAlpha = 1;
                 }
             });
 
-            // --- Draw Particles (Explosions) ---
+            // Particles
             particles.forEach(p => {
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
@@ -617,187 +620,82 @@
                 ctx.fill();
             });
             ctx.globalAlpha = 1;
-
-            // --- Draw Burst Particles (Orb Bursts) ---
-            burstParticles.forEach(b => {
-                ctx.globalAlpha = b.life;
-                ctx.fillStyle = b.color;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = b.color;
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1;
-            ctx.shadowBlur = 0;
         }
 
         function drawCharacter(ctx, x, y, scale) {
             ctx.save();
             ctx.translate(x, y);
             ctx.scale(scale, scale);
-            
-            // We offset Y slightly so "center" is middle of head
             ctx.translate(0, 20);
 
-            // 1. Hoodie Body (Rounded Bottom)
+            // Hoodie Body
             ctx.fillStyle = COLORS.hoodie;
-            ctx.beginPath();
-            ctx.ellipse(0, 50, 60, 50, 0, Math.PI, 0); // Semi circleish
-            ctx.fill();
-            // Fill gap
-            ctx.beginPath();
-            ctx.rect(-60, 0, 120, 50);
-            ctx.fill();
+            ctx.beginPath(); ctx.ellipse(0, 50, 60, 50, 0, Math.PI, 0); ctx.fill();
+            ctx.beginPath(); ctx.rect(-60, 0, 120, 50); ctx.fill();
 
-            // 2. Hoodie Head (Back)
+            // Head Back
             ctx.fillStyle = COLORS.darkPurple;
-            ctx.beginPath();
-            ctx.arc(0, 0, 55, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, 55, 0, Math.PI * 2); ctx.fill();
 
-            // 3. Face
+            // Face
             ctx.fillStyle = COLORS.skin;
-            ctx.beginPath();
-            ctx.arc(0, 5, 40, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 5, 40, 0, Math.PI * 2); ctx.fill();
             
-            // 4. Hoodie Rim (around face)
-            ctx.strokeStyle = COLORS.hoodie;
-            ctx.lineWidth = 10;
-            ctx.beginPath();
-            ctx.arc(0, 2, 50, 0.1, Math.PI - 0.1, true); // Arc around top
-            ctx.stroke();
+            // Rim
+            ctx.strokeStyle = COLORS.hoodie; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.arc(0, 2, 50, 0.1, Math.PI - 0.1, true); ctx.stroke();
 
-            // 5. Eyes (Closed/Sleeping)
-            ctx.strokeStyle = '#2d3436';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            
-            // Left Eye
-            ctx.beginPath();
-            ctx.moveTo(-20, 5);
-            ctx.lineTo(-10, 10);
-            ctx.lineTo(0, 5); // Wait, this is too close.
-            ctx.stroke();
-            
-            // Simple curve eyes
-            ctx.beginPath();
-            ctx.arc(-15, 5, 8, 0, Math.PI, false); // Left
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(15, 5, 8, 0, Math.PI, false); // Right
-            ctx.stroke();
+            // Eyes
+            ctx.strokeStyle = '#2d3436'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(-15, 5, 8, 0, Math.PI, false); ctx.stroke();
+            ctx.beginPath(); ctx.arc(15, 5, 8, 0, Math.PI, false); ctx.stroke();
 
-            // 6. Headphones
+            // Headphones
             ctx.fillStyle = COLORS.secondary;
-            // Left Ear Cup
-            ctx.beginPath();
-            ctx.ellipse(-55, 0, 15, 35, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Right Ear Cup
-            ctx.beginPath();
-            ctx.ellipse(55, 0, 15, 35, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Band
-            ctx.strokeStyle = COLORS.secondary;
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.arc(0, -10, 55, Math.PI, 0);
-            ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(-55, 0, 15, 35, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(55, 0, 15, 35, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = COLORS.secondary; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.arc(0, -10, 55, Math.PI, 0); ctx.stroke();
 
             ctx.restore();
         }
 
         function drawOrb(ctx, cx, cy, radius, color) {
-            // Add subtle pulse to radius
-            const pulse = Math.sin(gameTime * 6) * 0.5 + 1;
-            const pulseRadius = radius * pulse;
-            
-            // Glow
-            ctx.shadowBlur = 25 * pulse;
-            ctx.shadowColor = color;
-            
-            // Core
-            ctx.fillStyle = COLORS.white;
-            ctx.beginPath();
-            ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Inner color ring
-            ctx.shadowBlur = 0; // Reset for sharp lines
-            ctx.fillStyle = color;
-            ctx.globalAlpha = 0.85;
-            ctx.beginPath();
-            ctx.arc(cx, cy, pulseRadius * 0.8, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Shine highlight
-            ctx.fillStyle = COLORS.white;
-            ctx.globalAlpha = 0.95;
-            ctx.beginPath();
-            ctx.arc(cx - pulseRadius*0.3, cy - pulseRadius*0.3, pulseRadius * 0.25, 0, Math.PI * 2);
-            ctx.fill();
-            
+            ctx.shadowBlur = 20; ctx.shadowColor = color;
+            ctx.fillStyle = COLORS.white; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = color; ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.arc(cx, cy, radius * 0.8, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = COLORS.white; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(cx - radius*0.3, cy - radius*0.3, radius * 0.2, 0, Math.PI * 2); ctx.fill();
             ctx.globalAlpha = 1;
         }
 
-        // --- UI & Effects ---
-
         function updateScore() {
-            // Apply combo multiplier to score display
-            const displayScore = Math.floor(score * (1 + combo * 0.05));
-            document.getElementById('score-display').innerText = `Score: ${displayScore}`;
-            document.getElementById('combo-display').innerText = `Combo: ${combo} x${(1 + combo * 0.05).toFixed(2)}`;
+            document.getElementById('score-display').innerText = `Score: ${score}`;
+            document.getElementById('combo-display').innerText = `Combo: ${combo}`;
         }
 
         function showFeedback(text, color) {
             const el = document.getElementById('feedback');
-            el.innerText = text;
-            el.style.color = color;
-            el.style.opacity = 1;
+            el.innerText = text; el.style.color = color; el.style.opacity = 1;
             el.style.transform = 'translate(-50%, -50%) scale(1.5)';
-            
-            // Reset animation
-            setTimeout(() => {
-                el.style.opacity = 0;
-                el.style.transform = 'translate(-50%, -50%) scale(1)';
-            }, 500);
+            setTimeout(() => { el.style.opacity = 0; el.style.transform = 'translate(-50%, -50%) scale(1)'; }, 500);
+        }
+
+        function spawnPulseRing(x, y, color) {
+            pulseRings.push({ x: x, y: y, radius: 60, opacity: 1, color: color });
         }
 
         function createExplosion(x, y, color) {
-            for(let i=0; i<12; i++) {
+            for(let i=0; i<20; i++) {
                 particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 15,
-                    vy: (Math.random() - 0.5) * 15,
-                    life: 1,
-                    color: color,
-                    size: Math.random() * 6 + 3
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 25, 
+                    vy: (Math.random() - 0.5) * 25, 
+                    life: 1, color: color, 
+                    size: Math.random() * 8 + 4 
                 });
             }
         }
-
-        function createOrbBurst(x, y, color, noteType) {
-            const burstCount = noteType === 'offbeat' ? 18 : 12;
-            for(let i = 0; i < burstCount; i++) {
-                const angle = (Math.PI * 2 * i) / burstCount;
-                const speed = 8 + Math.random() * 4;
-                burstParticles.push({
-                    x: x,
-                    y: y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    life: 1,
-                    color: color,
-                    size: Math.random() * 4 + 2
-                });
-            }
-        }
-        
     </script>
 </body>
 </html>
