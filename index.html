@@ -185,6 +185,7 @@
                     <p>Press SPACE or CLICK on beat</p>
                 </div>
             </div>
+            <div id="mode-display" class="hud-text text-center text-2xl font-bold opacity-70">→ RIGHT</div>
             <div id="feedback">Perfect!</div>
         </div>
 
@@ -203,7 +204,7 @@
         const BEAT_INTERVAL = 60 / BPM; // Seconds per beat (0.5s)
         const TRAVEL_TIME_BEATS = 4; // How many beats it takes for an object to travel to target
         const AUDIO_OFFSET = 0.1; // Slight adjustment for audio/visual sync (seconds)
-        const HIT_WINDOW = 0.15; // Seconds +/- to count as a hit
+        const HIT_WINDOW = 0.2; // Seconds +/- to count as a hit (increased for easier play)
         
         // Colors
         const COLORS = {
@@ -229,6 +230,7 @@
         let notes = []; // Array of objects { beatTime, hit, visible }
         let particles = []; // Visual effects
         let zzzParticles = []; // Sleep particles
+        let burstParticles = []; // Orb burst particles when hit
         
         // Canvas Setup
         const canvas = document.getElementById('gameCanvas');
@@ -305,24 +307,35 @@
             
             // Generate Notes Pattern
             // We'll generate notes procedurally for the song duration (~3 mins)
-            // Pattern: Simple 4/4 beat with occasional off-beats or doubles
+            // Pattern: Simple 4/4 beat with variation in direction (left, right, both)
             let totalBeats = 120 * 3.5; // approx 3.5 mins
+            
+            let direction = 'right'; // Start from right
+            let directionCounter = 0;
+            const directionCycle = [8, 8, 8]; // 8 beats each: right, left, both
             
             // Wait a few seconds for intro before spawning
             for(let i = 8; i < totalBeats; i++) {
-                // Basic Rhythm: Hit on every beat
-                // Skip some to make it interesting
-                if (Math.random() > 0.1) {
+                // Cycle through directions every 8 beats
+                directionCounter++;
+                if (directionCounter >= directionCycle[directionCycle.indexOf(directionCounter % 3) % 3]) {
+                    const directions = ['right', 'left', 'both'];
+                    direction = directions[Math.floor((i - 8) / 8) % 3];
+                }
+                
+                // Easier play: More frequent beats, simpler pattern
+                if (Math.random() > 0.05) {
                     // Add some variation
                     if (i % 4 === 0) {
                         // Downbeat - always spawn
-                        notes.push({ beatIndex: i, hit: false, type: 'beat' });
-                    } else if (i % 8 === 7 && Math.random() > 0.5) {
-                        // Double beat flair
-                        notes.push({ beatIndex: i, hit: false, type: 'beat' });
-                        notes.push({ beatIndex: i + 0.5, hit: false, type: 'offbeat' });
-                    } else {
-                        notes.push({ beatIndex: i, hit: false, type: 'beat' });
+                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
+                    } else if (i % 8 === 7 && Math.random() > 0.3) {
+                        // Double beat flair - more frequent
+                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
+                        notes.push({ beatIndex: i + 0.5, hit: false, type: 'offbeat', direction: direction });
+                    } else if (Math.random() > 0.4) {
+                        // Additional beat for engagement
+                        notes.push({ beatIndex: i, hit: false, type: 'beat', direction: direction });
                     }
                 }
             }
@@ -368,6 +381,15 @@
                 particles[i].x += particles[i].vx;
                 particles[i].y += particles[i].vy;
                 if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+
+            // Update burst particles (orb bursts)
+            for (let i = burstParticles.length - 1; i >= 0; i--) {
+                burstParticles[i].life -= 0.03;
+                burstParticles[i].x += burstParticles[i].vx;
+                burstParticles[i].y += burstParticles[i].vy;
+                burstParticles[i].vy += 0.2; // Gravity effect
+                if (burstParticles[i].life <= 0) burstParticles.splice(i, 1);
             }
 
             // Update Zzz particles
@@ -425,21 +447,29 @@
                 hitNote.hit = true;
                 const timing = minDiff * BEAT_INTERVAL;
                 
+                // Calculate hit position based on direction
+                let hitX = width/2;
+                if (hitNote.direction === 'left') hitX = width * 0.25;
+                else if (hitNote.direction === 'right') hitX = width * 0.75;
+                
                 // Scoring
                 if (timing < 0.05) {
                     score += 100;
                     combo++;
                     showFeedback("Perfect!", COLORS.primary);
-                    createExplosion(width/2, height/2, COLORS.primary);
+                    createExplosion(hitX, height/2, COLORS.primary);
+                    createOrbBurst(hitX, height/2, COLORS.primary, hitNote.type);
                 } else if (timing < 0.1) {
                     score += 50;
                     combo++;
                     showFeedback("Good", COLORS.secondary);
-                    createExplosion(width/2, height/2, COLORS.secondary);
+                    createExplosion(hitX, height/2, COLORS.secondary);
+                    createOrbBurst(hitX, height/2, COLORS.secondary, hitNote.type);
                 } else {
-                    score += 20;
-                    combo++; // Keep combo but low score
+                    score += 30;
+                    combo++; // Keep combo, easier scoring
                     showFeedback("Okay", COLORS.accent);
+                    createOrbBurst(hitX, height/2, COLORS.accent, hitNote.type);
                 }
                 
                 // Catch animation trigger - Character wake/bop
@@ -472,6 +502,11 @@
             const beatPhase = currentBeat % 1; // 0 to 1
             const pulse = Math.pow(1 - beatPhase, 3); // Strong at start of beat, fades
 
+            // Update mode display based on current section
+            const currentDirection = ['right', 'left', 'both'][Math.floor((currentBeat - 8) / 8) % 3];
+            const directionSymbol = currentDirection === 'left' ? '← LEFT' : currentDirection === 'both' ? '↔ BOTH' : '→ RIGHT';
+            document.getElementById('mode-display').innerText = directionSymbol;
+
             // Draw dreamy background grid
             ctx.strokeStyle = COLORS.grid;
             ctx.lineWidth = 2;
@@ -488,6 +523,28 @@
             // --- Draw Character ---
             const cx = width / 2;
             const cy = height / 2;
+
+            // --- Draw Hit Zone Indicators ---
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            
+            // Left zone
+            ctx.beginPath();
+            ctx.arc(width * 0.25, cy, 80, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Center zone
+            ctx.beginPath();
+            ctx.arc(width / 2, cy, 80, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Right zone
+            ctx.beginPath();
+            ctx.arc(width * 0.75, cy, 80, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
             
             // Ease the catcher scale back to base
             catcher.scale += (catcher.baseScale - catcher.scale) * 0.1;
@@ -517,8 +574,29 @@
                 // Only draw if within visible range (e.g., 2 seconds out)
                 if (timeToHit > -0.5 && timeToHit < 2) {
                     
-                    // Calculate position: Fly from Right to Center
-                    const x = cx + (timeToHit * 400); 
+                    // Calculate position based on direction
+                    let startX, targetX;
+                    if (note.direction === 'left') {
+                        startX = -100;
+                        targetX = width * 0.25;
+                    } else if (note.direction === 'both') {
+                        // For 'both', alternate left and right
+                        if (note.beatIndex % 2 === 0) {
+                            startX = -100;
+                            targetX = width * 0.25;
+                        } else {
+                            startX = width + 100;
+                            targetX = width * 0.75;
+                        }
+                    } else {
+                        // default 'right'
+                        startX = width + 100;
+                        targetX = width * 0.75;
+                    }
+                    
+                    // Interpolate position based on time to hit
+                    const progress = 1 - (timeToHit / 2); // 2 second travel time
+                    const x = startX + (targetX - startX) * Math.max(0, Math.min(1, progress));
                     const y = cy; 
                     
                     // Visuals for the note
@@ -545,6 +623,19 @@
                 ctx.fill();
             });
             ctx.globalAlpha = 1;
+
+            // --- Draw Burst Particles (Orb Bursts) ---
+            burstParticles.forEach(b => {
+                ctx.globalAlpha = b.life;
+                ctx.fillStyle = b.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
         }
 
         function drawCharacter(ctx, x, y, scale) {
@@ -627,29 +718,33 @@
         }
 
         function drawOrb(ctx, cx, cy, radius, color) {
+            // Add subtle pulse to radius
+            const pulse = Math.sin(gameTime * 6) * 0.5 + 1;
+            const pulseRadius = radius * pulse;
+            
             // Glow
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = 25 * pulse;
             ctx.shadowColor = color;
             
             // Core
             ctx.fillStyle = COLORS.white;
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
             ctx.fill();
             
             // Inner color ring
             ctx.shadowBlur = 0; // Reset for sharp lines
             ctx.fillStyle = color;
-            ctx.globalAlpha = 0.8;
+            ctx.globalAlpha = 0.85;
             ctx.beginPath();
-            ctx.arc(cx, cy, radius * 0.8, 0, Math.PI * 2);
+            ctx.arc(cx, cy, pulseRadius * 0.8, 0, Math.PI * 2);
             ctx.fill();
             
             // Shine highlight
             ctx.fillStyle = COLORS.white;
-            ctx.globalAlpha = 0.9;
+            ctx.globalAlpha = 0.95;
             ctx.beginPath();
-            ctx.arc(cx - radius*0.3, cy - radius*0.3, radius * 0.2, 0, Math.PI * 2);
+            ctx.arc(cx - pulseRadius*0.3, cy - pulseRadius*0.3, pulseRadius * 0.25, 0, Math.PI * 2);
             ctx.fill();
             
             ctx.globalAlpha = 1;
@@ -658,8 +753,10 @@
         // --- UI & Effects ---
 
         function updateScore() {
-            document.getElementById('score-display').innerText = `Score: ${score}`;
-            document.getElementById('combo-display').innerText = `Combo: ${combo}`;
+            // Apply combo multiplier to score display
+            const displayScore = Math.floor(score * (1 + combo * 0.05));
+            document.getElementById('score-display').innerText = `Score: ${displayScore}`;
+            document.getElementById('combo-display').innerText = `Combo: ${combo} x${(1 + combo * 0.05).toFixed(2)}`;
         }
 
         function showFeedback(text, color) {
@@ -686,6 +783,23 @@
                     life: 1,
                     color: color,
                     size: Math.random() * 6 + 3
+                });
+            }
+        }
+
+        function createOrbBurst(x, y, color, noteType) {
+            const burstCount = noteType === 'offbeat' ? 18 : 12;
+            for(let i = 0; i < burstCount; i++) {
+                const angle = (Math.PI * 2 * i) / burstCount;
+                const speed = 8 + Math.random() * 4;
+                burstParticles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    color: color,
+                    size: Math.random() * 4 + 2
                 });
             }
         }
