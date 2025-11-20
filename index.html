@@ -310,18 +310,12 @@
             // Pattern: Simple 4/4 beat with variation in direction (left, right, both)
             let totalBeats = 120 * 3.5; // approx 3.5 mins
             
-            let direction = 'right'; // Start from right
-            let directionCounter = 0;
-            const directionCycle = [8, 8, 8]; // 8 beats each: right, left, both
+            const directions = ['right', 'left', 'both'];
             
             // Wait a few seconds for intro before spawning
             for(let i = 8; i < totalBeats; i++) {
                 // Cycle through directions every 8 beats
-                directionCounter++;
-                if (directionCounter >= directionCycle[directionCycle.indexOf(directionCounter % 3) % 3]) {
-                    const directions = ['right', 'left', 'both'];
-                    direction = directions[Math.floor((i - 8) / 8) % 3];
-                }
+                const direction = directions[Math.floor((i - 8) / 8) % 3];
                 
                 // Easier play: More frequent beats, simpler pattern
                 if (Math.random() > 0.05) {
